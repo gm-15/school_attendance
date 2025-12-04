@@ -44,17 +44,13 @@ const AuditLog = sequelize.define('AuditLog', {
 }, {
   tableName: 'AuditLogs',
   timestamps: true,
+  underscored: true,   // ★ 반드시 추가!
   indexes: [
-    {
-      fields: ['target_type', 'target_id']
-    },
-    {
-      fields: ['user_id']
-    },
-    {
-      fields: ['created_at']
-    }
+    { fields: ['target_type', 'target_id'] },
+    { fields: ['user_id'] },
+    { fields: ['created_at'] }
   ]
 });
+
 
 export default AuditLog;

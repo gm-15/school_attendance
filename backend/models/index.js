@@ -151,4 +151,5 @@ export {
   SystemSetting
 };
 
-export default models;
+// ⭐ default export 를 models → sequelize로 변경
+export default sequelize;

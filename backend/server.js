@@ -6,6 +6,9 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+// ⭐ 추가: Sequelize 인스턴스 import
+import sequelize from './models/index.js';
+
 // 환경 변수 로드
 dotenv.config();
 
@@ -46,11 +49,9 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
-    // 개발 환경에서는 모든 origin 허용 (네트워크 접속을 위해)
     if (process.env.NODE_ENV === 'development' || !origin) {
       return callback(null, true);
     }
-    // 프로덕션에서는 지정된 origin만 허용
     const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:5173'];
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
@@ -102,6 +103,15 @@ app.use(errorHandler);
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
 });
+
+// ⭐⭐ DB Sync 추가 ⭐⭐
+sequelize.sync({ alter: true })
+  .then(() => {
+    console.log("✅ Database synced successfully!");
+  })
+  .catch(err => {
+    console.error("❌ DB Sync error:", err);
+  });
 
 // 서버 시작
 app.listen(PORT, '0.0.0.0', () => {
