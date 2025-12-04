@@ -12,7 +12,7 @@ const Semester = sequelize.define('Semester', {
     allowNull: false
   },
   term: {
-    type: DataTypes.ENUM('1', '2', '여름', '겨울'),
+    type: DataTypes.STRING(10),
     allowNull: false
   },
   start_date: {
