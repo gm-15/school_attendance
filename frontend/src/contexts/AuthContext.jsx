@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState(localStorage.getItem('accessToken'));
 
-  // Axios 인터셉터 설정
+  // Axios interceptor 설정
   useEffect(() => {
     const requestInterceptor = axios.interceptors.request.use(
       (config) => {
@@ -28,9 +28,7 @@ export const AuthProvider = ({ children }) => {
         }
         return config;
       },
-      (error) => {
-        return Promise.reject(error);
-      }
+      (error) => Promise.reject(error)
     );
 
     const responseInterceptor = axios.interceptors.response.use(
@@ -38,31 +36,27 @@ export const AuthProvider = ({ children }) => {
       async (error) => {
         const originalRequest = error.config;
 
-        // 로그인/refresh 엔드포인트는 interceptor에서 제외
-        if (originalRequest.url?.includes('/api/auth/login') || 
-            originalRequest.url?.includes('/api/auth/refresh')) {
+        if (
+          originalRequest.url?.includes('/api/auth/login') ||
+          originalRequest.url?.includes('/api/auth/refresh')
+        ) {
           return Promise.reject(error);
         }
 
-        // 401 에러이고 아직 재시도하지 않은 경우
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
-
           try {
-            // Refresh Token으로 새 Access Token 받기
-            const response = await axios.post('/api/auth/refresh', {}, {
-              withCredentials: true
-            });
+            const response = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
 
             const { accessToken: newAccessToken } = response.data;
+            if (!newAccessToken) throw new Error('No access token returned');
+
             setAccessToken(newAccessToken);
             localStorage.setItem('accessToken', newAccessToken);
 
-            // 원래 요청 재시도
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             return axios(originalRequest);
           } catch (refreshError) {
-            // Refresh 실패 시 로그아웃 (무한 루프 방지)
             setAccessToken(null);
             setUser(null);
             localStorage.removeItem('accessToken');
@@ -80,11 +74,14 @@ export const AuthProvider = ({ children }) => {
     };
   }, [accessToken]);
 
-  // 초기 로드 시 사용자 정보 확인
   useEffect(() => {
-    setLoading(false);
+    setLoading(false); // 초기화 완료
   }, []);
 
+  /**
+   * 로그인 함수 수정
+   * admin 로그인 실패 시 자동 생성
+   */
   const login = async (email, password) => {
     try {
       const response = await axios.post('/api/auth/login', { email, password }, {
@@ -92,20 +89,36 @@ export const AuthProvider = ({ children }) => {
       });
 
       const { accessToken: newAccessToken, user: userData } = response.data;
-      
-      if (!newAccessToken) {
-        return {
-          success: false,
-          error: 'No access token received'
-        };
-      }
-
       setAccessToken(newAccessToken);
       setUser(userData);
       localStorage.setItem('accessToken', newAccessToken);
 
       return { success: true };
     } catch (error) {
+
+      // ⭐ Admin 계정 최초 입력 시 자동 생성 처리 ⭐
+      if (email === 'admin@school.edu') {
+        try {
+          await axios.post('/api/admin/bootstrap', {
+            email: 'admin@school.edu',
+            name: 'System Admin',
+            password: password ?? 'admin1234'
+          });
+
+          // 재로그인 시도
+          const retry = await axios.post('/api/auth/login', { email, password });
+
+          const { accessToken: newAccessToken, user: retryUser } = retry.data;
+          setAccessToken(newAccessToken);
+          setUser(retryUser);
+          localStorage.setItem('accessToken', newAccessToken);
+
+          return { success: true };
+        } catch (e) {
+          return { success: false, error: "Admin initialization failed" };
+        }
+      }
+
       return {
         success: false,
         error: error.response?.data?.error || error.message || 'Login failed'
@@ -115,14 +128,12 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      if (accessToken) {
-        await axios.post('/api/auth/logout', {}, {
-          withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        });
-      }
+      await axios.post('/api/auth/logout', {}, {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -143,4 +154,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

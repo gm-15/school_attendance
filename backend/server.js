@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// ⭐ 추가: Sequelize 인스턴스 import
+// ⭐ Sequelize 인스턴스 import
 import sequelize from './models/index.js';
 
 // 환경 변수 로드
@@ -48,11 +48,15 @@ const PORT = process.env.PORT || 3000;
 // 미들웨어 설정
 app.use(helmet());
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: function(origin, callback) {
     if (process.env.NODE_ENV === 'development' || !origin) {
       return callback(null, true);
     }
-    const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:5173'];
+
+    const allowedOrigins = process.env.CORS_ORIGIN ?
+      process.env.CORS_ORIGIN.split(',') :
+      ['http://localhost:5173'];
+
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
@@ -61,12 +65,16 @@ app.use(cors({
   },
   credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // 정적 파일 서빙 (업로드된 파일)
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
+
+// ⭐⭐ 가장 중요: Admin bootstrap은 인증 전에 라우팅되어야 함 ⭐⭐
+app.use('/api/admin', adminRoutes);
 
 // API 라우트
 app.use('/api/auth', authRoutes);
@@ -88,7 +96,6 @@ app.use('/api/files', fileRoutes);
 app.use('/api/audits', auditRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/system', systemRoutes);
 
 // 헬스 체크
@@ -104,7 +111,7 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
 });
 
-// ⭐⭐ DB Sync 추가 ⭐⭐
+// ⭐⭐ DB Sync ⭐⭐
 sequelize.sync({ alter: true })
   .then(() => {
     console.log("✅ Database synced successfully!");
